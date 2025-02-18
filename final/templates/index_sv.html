@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nhận diện khuôn mặt</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+            text-align: center;
+        }
+        .content {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: flex-start;
+            width: 100%;
+        }
+        .left-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-right: 20px;
+        }
+        .right-container {
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+        .buttons {
+            margin-top: 10px;
+        }
+        button {
+            margin: 5px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #message {
+            margin-top: 15px;
+            font-size: 18px;
+            color: green;
+            font-weight: bold;
+        }
+        #diemdanh-list {
+            margin-top: 20px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="font-size: 50px;">ỨNG DỤNG ĐIỂM DANH</h1>
+    <div class="content">
+        <div class="left-container">
+            <img src="{{ url_for('video_feed') }}" width="640" height="480">
+            <div class="buttons">
+                <button onclick="diemDanh()">Điểm danh</button>
+            </div>
+            <div id="message"></div> <!-- Thông báo hiển thị ở đây -->
+        </div>
+
+        <div class="right-container">
+            <label style="font-size: 30px" for="hour">Giờ:</label>
+            <input style="font-size: 30px" type="number" id="hour" min="0" max="23" value="0" disabled>
+            <label style="font-size: 30px" for="minute">Phút:</label>
+            <input style="font-size: 30px" type="number" id="minute" min="0" max="59" value="0" disabled>
+            <div id="diemdanh-list" class="table-responsive"></div> <!-- Danh sách điểm danh -->
+        </div>
+    </div>
+
+    <script>
+        // Simulating getting the loaitk (teacher or student) value
+        const loaitk = "{{ loaitk }}"; // Pass loaitk from server to frontend
+
+        document.addEventListener("DOMContentLoaded", function () {
+            loadDiemDanhList();
+            getTime();
+
+            // Enable or disable time modification based on loaitk
+            if (loaitk === "gv") {
+                document.getElementById("hour").disabled = true;
+                document.getElementById("minute").disabled = true;
+            }
+        });
+
+        function diemDanh() {
+            const hour = document.getElementById("hour").value;
+            const minute = document.getElementById("minute").value;
+
+            fetch("/diemdanh", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ hour, minute })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const messageDiv = document.getElementById("message");
+                if (data.status === "success") {
+                    messageDiv.style.color = "green";
+                } else {
+                    messageDiv.style.color = "red";
+                }
+                messageDiv.innerText = data.message;
+                loadDiemDanhList();
+            })
+            .catch(error => console.error("Lỗi khi điểm danh:", error));
+        }
+
+        function saveTime() {
+            const hour = document.getElementById("hour").value;
+            const minute = document.getElementById("minute").value;
+
+            fetch("/save_time", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({ hour, minute })
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+            })
+            .catch(error => console.error("Lỗi khi lưu thời gian:", error));
+        }
+
+        function getTime() {
+            fetch("/get_time")
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("hour").value = data.gio;
+                document.getElementById("minute").value = data.phut;
+            })
+            .catch(error => console.error("Lỗi khi lấy thời gian:", error));
+        }
+
+        function loadDiemDanhList() {
+            fetch("/diemdanh_list")
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById("diemdanh-list").innerHTML = data;
+            })
+            .catch(error => console.error("Lỗi khi tải danh sách điểm danh:", error));
+        }
+
+    </script>
+
+</body>
+</html>

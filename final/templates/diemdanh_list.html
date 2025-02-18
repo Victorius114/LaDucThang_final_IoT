@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Danh sách điểm danh</title>
+    <style>
+        table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            cursor: pointer;
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Danh sách điểm danh</h1>
+    <table id="attendanceTable">
+        {{ tables|safe }}
+    </table>
+
+    <script>
+        function sortTable(colIndex) {
+            let table = document.getElementById("attendanceTable");
+            let rows = Array.from(table.rows).slice(1); // Bỏ qua hàng tiêu đề
+            let isAscending = table.getAttribute("data-sort") === "asc";
+
+            rows.sort((rowA, rowB) => {
+                let cellA = rowA.cells[colIndex].innerText.trim();
+                let cellB = rowB.cells[colIndex].innerText.trim();
+
+                if (colIndex === 2) { // Cột "Thời gian điểm danh"
+                    return isAscending ? new Date(cellA) - new Date(cellB) : new Date(cellB) - new Date(cellA);
+                } else { // Các cột khác (MSSV, Họ và tên, Trạng thái)
+                    return isAscending ? cellA.localeCompare(cellB, 'vi') : cellB.localeCompare(cellA, 'vi');
+                }
+            });
+
+            table.setAttribute("data-sort", isAscending ? "desc" : "asc");
+
+            let tbody = table.getElementsByTagName("tbody")[0];
+            tbody.innerHTML = "";
+            rows.forEach(row => tbody.appendChild(row));
+        }
+
+        // Thêm sự kiện click vào các cột tiêu đề để sắp xếp
+        document.addEventListener("DOMContentLoaded", () => {
+            let table = document.getElementById("attendanceTable");
+            let headers = table.getElementsByTagName("th");
+
+            for (let i = 0; i < headers.length; i++) {
+                headers[i].addEventListener("click", () => sortTable(i));
+            }
+        });
+    </script>
+</body>
+</html>
