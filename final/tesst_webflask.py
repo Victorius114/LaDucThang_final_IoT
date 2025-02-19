@@ -167,7 +167,7 @@ def detect_face():
                 distances = [cosine(face_embedding, stored_embedding) for stored_embedding in dataset_embeddings]
                 min_distance_idx = np.argmin(distances)
                 min_distance = distances[min_distance_idx]
-                label = dataset_labels[min_distance_idx] if min_distance < 0.4 else "Unknown"
+                label = dataset_labels[min_distance_idx] if min_distance < 0.6 else "Unknown"
                 detected_label = label
                 color = (0, 255, 0) if label != "Unknown" else (0, 0, 255)
                 cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
