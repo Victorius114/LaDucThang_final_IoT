@@ -13,7 +13,7 @@ app = Flask(__name__)
 
 # Kết nối với cơ sở dữ liệu SQLite
 def connect_to_db():
-    conn = sqlite3.connect(r'db_mysql\Nhan_dien.db', check_same_thread=False)
+    conn = sqlite3.connect(r'db_mysql/Nhan_dien.db', check_same_thread=False)
     return conn
 
 # Lấy danh sách MSSV và thông tin từ SQLite
@@ -138,7 +138,7 @@ current_frame = None  # Biến toàn cục để lưu frame hiện tại
 # Hàm nhận diện khuôn mặt từ webcam
 def detect_face():
     global detected_label, current_frame
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture("http://192.168.1.81:81/stream")
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -167,7 +167,7 @@ def detect_face():
                 distances = [cosine(face_embedding, stored_embedding) for stored_embedding in dataset_embeddings]
                 min_distance_idx = np.argmin(distances)
                 min_distance = distances[min_distance_idx]
-                label = dataset_labels[min_distance_idx] if min_distance < 0.6 else "Unknown"
+                label = dataset_labels[min_distance_idx] if min_distance < 0.4 else "Unknown"
                 detected_label = label
                 color = (0, 255, 0) if label != "Unknown" else (0, 0, 255)
                 cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
@@ -228,15 +228,6 @@ def diemdanh():
 
         index = mssv_list.index(detected_label)
         time_str = time_now.strftime("%Y-%m-%d %H:%M:%S")
-
-        # Chụp ảnh từ frame hiện tại
-        if current_frame is not None:
-            save_dir = r'/captured_images'
-            if not os.path.exists(save_dir):
-                os.makedirs(save_dir)
-            image_name = f"{detected_label}_{time_str.replace(':', '-')}.jpg"
-            image_path = os.path.join(save_dir, image_name)
-            cv2.imwrite(image_path, current_frame)
 
         # Lưu thông tin điểm danh vào database
         query = "INSERT INTO Diem_danh (MSSV, [Thời gian điểm danh], [Trạng thái]) VALUES (?, ?, ?)"
