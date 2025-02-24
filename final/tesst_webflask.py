@@ -138,7 +138,7 @@ current_frame = None  # Biến toàn cục để lưu frame hiện tại
 # Hàm nhận diện khuôn mặt từ webcam
 def detect_face():
     global detected_label, current_frame
-    cap = cv2.VideoCapture("http://192.168.1.81:81/stream")
+    cap = cv2.VideoCapture(0)
     while True:
         ret, frame = cap.read()
         if not ret:
@@ -208,45 +208,70 @@ def diemdanh():
 
         if row:
             gio, phut = row
-
-            # So sánh giờ và phút trong bảng với giờ phút nhập vào
             if gio != hour or phut != minute:
-                # Cập nhật lại giờ và phút trong bảng
                 update_query = "UPDATE Thoigian_tiet SET gio = ?, phut = ? WHERE gio = ? AND phut = ?"
-                cursor.execute(update_query, (hour, minute))
+                cursor.execute(update_query, (hour, minute, gio, phut))
                 conn.commit()
 
-        # Tạo thời gian điểm danh từ giờ và phút nhập vào
+        # Lấy thời gian hiện tại và thời gian điểm danh
         time_now = datetime.now()
         diemdanh_time = time_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
         # Kiểm tra xem có đến muộn hay không
-        if time_now < diemdanh_time:
-            state = "Đúng giờ"
-        else:
-            state = "Đến muộn"
+        state = "Đúng giờ" if time_now < diemdanh_time else "Đến muộn"
 
         index = mssv_list.index(detected_label)
         time_str = time_now.strftime("%Y-%m-%d %H:%M:%S")
 
-        # Lưu thông tin điểm danh vào database
+        check_query = "SELECT gio, phut FROM Thoigian_tiet LIMIT 1"
+        cursor.execute(check_query)
+        lesson_time = cursor.fetchone()
+
+        if lesson_time:
+            lesson_hour, lesson_minute = lesson_time  # Giờ và phút của tiết học
+
+            # Lấy lần điểm danh gần nhất của sinh viên
+            check_query = """
+                SELECT [Thời gian điểm danh] FROM Diem_danh 
+                WHERE MSSV = ? 
+                ORDER BY [Thời gian điểm danh] DESC LIMIT 1
+            """
+            cursor.execute(check_query, (mssv_list[index],))
+            last_diemdanh = cursor.fetchone()
+
+            if last_diemdanh:
+                last_diemdanh_time = datetime.strptime(last_diemdanh[0], "%Y-%m-%d %H:%M:%S")
+
+                # Tạo thời gian bắt đầu tiết học
+                lesson_start_time = last_diemdanh_time.replace(hour=lesson_hour, minute=lesson_minute, second=0)
+
+                # Tính chênh lệch thời gian (phút)
+                time_diff = (last_diemdanh_time - lesson_start_time).total_seconds() / 60
+
+                if 0 <= time_diff <= 50:  # Nếu điểm danh trong vòng 50 phút kể từ tiết học
+                    return jsonify({
+                        'status': 'fail',
+                        'message': f'{mssv_list[index]} đã điểm danh vào lúc {last_diemdanh[0]}'
+                    })
+
+        # Nếu chưa điểm danh trong 50 phút, lưu vào database
         query = "INSERT INTO Diem_danh (MSSV, [Thời gian điểm danh], [Trạng thái]) VALUES (?, ?, ?)"
-        cursor = conn.cursor()
         try:
             cursor.execute(query, (mssv_list[index], time_str, state))
-            conn.commit()  # Commit transaction
-            inserted_id = cursor.lastrowid  # Lấy giá trị id vừa chèn
+            conn.commit()
+            inserted_id = cursor.lastrowid
             return jsonify({
                 'id': inserted_id,
                 'mssv': mssv_list[index],
                 'status': 'success',
-                'message': f'Đã điểm danh - {state}',
-                'image_path': image_path
+                'message': f'Đã điểm danh - {state}'
             })
         except sqlite3.Error as e:
-            conn.rollback()  # Rollback nếu có lỗi
+            conn.rollback()
             return jsonify({'status': 'fail', 'message': f'Lỗi khi chèn dữ liệu: {str(e)}'})
+
     return jsonify({'status': 'fail', 'message': 'Không nhận diện được khuôn mặt'})
+
 
 @app.route('/diemdanh_list')
 def diemdanh_list():
