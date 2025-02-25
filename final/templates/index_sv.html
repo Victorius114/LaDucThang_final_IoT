@@ -50,6 +50,15 @@
             margin-top: 20px;
             width: 100%;
         }
+        #diemdanh-list {
+            margin-top: 10px;
+            width: 90%;
+            max-height: 400px; /* Giới hạn chiều cao */
+            overflow-y: auto; /* Thanh cuộn dọc */
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: left;
+        }
     </style>
 </head>
 <body>
@@ -64,92 +73,81 @@
         </div>
 
         <div class="right-container">
+
             <label style="font-size: 30px" for="hour">Giờ:</label>
             <input style="font-size: 30px" type="number" id="hour" min="0" max="23" value="0" disabled>
             <label style="font-size: 30px" for="minute">Phút:</label>
             <input style="font-size: 30px" type="number" id="minute" min="0" max="59" value="0" disabled>
-            <div id="diemdanh-list" class="table-responsive"></div> <!-- Danh sách điểm danh -->
+            <!-- Tiêu đề được đặt ngoài ô danh sách -->
+            <h1 style="margin-top: 20px;">Danh sách điểm danh</h1>
+            <div id="diemdanh-container"></div> <!-- Danh sách có thanh cuộn -->
+            <div id="diemdanh-list"></div> <!-- Danh sách điểm danh có thanh cuộn -->
+
         </div>
     </div>
 
     <script>
-        // Simulating getting the loaitk (teacher or student) value
-        const loaitk = "{{ loaitk }}"; // Pass loaitk from server to frontend
+        // Tải giờ và phút từ server khi trang được tải
+        window.onload = function() {
+            fetch('/get_time')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('hour').value = data.gio;
+                    document.getElementById('minute').value = data.phut;
+                })
+                .catch(error => console.error('Lỗi khi tải thời gian:', error));
+        }
 
-        document.addEventListener("DOMContentLoaded", function () {
-            loadDiemDanhList();
-            getTime();
-
-            // Enable or disable time modification based on loaitk
-            if (loaitk === "gv") {
-                document.getElementById("hour").disabled = true;
-                document.getElementById("minute").disabled = true;
-            }
-        });
-
+        // Chức năng điểm danh
         function diemDanh() {
-            const hour = document.getElementById("hour").value;
-            const minute = document.getElementById("minute").value;
+            const hour = document.getElementById('hour').value;
+            const minute = document.getElementById('minute').value;
 
-            fetch("/diemdanh", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ hour, minute })
+            fetch('/diemdanh', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ hour: hour, minute: minute }),
             })
             .then(response => response.json())
             .then(data => {
-                const messageDiv = document.getElementById("message");
-                if (data.status === "success") {
-                    messageDiv.style.color = "green";
-                } else {
-                    messageDiv.style.color = "red";
-                }
+                let messageDiv = document.getElementById('message');
                 messageDiv.innerText = data.message;
+                messageDiv.style.color = data.status === 'success' ? 'green' : 'red';
                 loadDiemDanhList();
             })
-            .catch(error => console.error("Lỗi khi điểm danh:", error));
+            .catch(error => console.error('Lỗi:', error));
         }
 
+        // Lưu thời gian vào cơ sở dữ liệu
         function saveTime() {
-            const hour = document.getElementById("hour").value;
-            const minute = document.getElementById("minute").value;
+            const hour = document.getElementById('hour').value;
+            const minute = document.getElementById('minute').value;
 
-            fetch("/save_time", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ hour, minute })
+            fetch('/save_time', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ hour: hour, minute: minute }),
             })
             .then(response => response.json())
             .then(data => {
                 alert(data.message);
+                loadDiemDanhList();
             })
-            .catch(error => console.error("Lỗi khi lưu thời gian:", error));
+            .catch(error => console.error('Lỗi khi lưu thời gian:', error));
         }
 
-        function getTime() {
-            fetch("/get_time")
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById("hour").value = data.gio;
-                document.getElementById("minute").value = data.phut;
-            })
-            .catch(error => console.error("Lỗi khi lấy thời gian:", error));
-        }
-
+        // Tải lại danh sách điểm danh
         function loadDiemDanhList() {
-            fetch("/diemdanh_list")
-            .then(response => response.text())
-            .then(data => {
-                document.getElementById("diemdanh-list").innerHTML = data;
-            })
-            .catch(error => console.error("Lỗi khi tải danh sách điểm danh:", error));
+            fetch('/diemdanh_list')
+                .then(response => response.text())
+                .then(html => {
+                    document.getElementById("diemdanh-list").innerHTML = html;
+                })
+                .catch(error => console.error("Lỗi:", error));
         }
 
+        // Gọi loadDiemDanhList khi trang được tải
+        loadDiemDanhList();
     </script>
-
 </body>
 </html>

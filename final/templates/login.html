@@ -52,6 +52,12 @@
             font-size: 14px;
             display: none;
         }
+        #loading {
+            display: none;
+            margin-top: 15px;
+            color: blue;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
@@ -63,6 +69,7 @@
             <input type="password" id="password" placeholder="Nhập mật khẩu" required>
             <button type="submit">Đăng Nhập</button>
         </form>
+        <div id="loading">Đang xử lý, vui lòng đợi...</div>
         <div id="error-message"></div>
     </div>
 
@@ -70,15 +77,25 @@
         document.getElementById("login-form").addEventListener("submit", function(event) {
             event.preventDefault();  // Ngừng gửi form mặc định
 
-            const user_id = document.getElementById("user_id").value;
-            const password = document.getElementById("password").value;
+            const user_id = document.getElementById("user_id").value.trim();
+            const password = document.getElementById("password").value.trim();
+            const errorMessage = document.getElementById("error-message");
+            const loadingMessage = document.getElementById("loading");
+
+            if (!user_id || !password) {
+                errorMessage.textContent = "Vui lòng nhập ID và mật khẩu!";
+                errorMessage.style.display = "block";
+                return;
+            }
+
+            errorMessage.style.display = "none"; // Ẩn thông báo lỗi cũ
+            loadingMessage.style.display = "block"; // Hiển thị thông báo loading
 
             const loginData = {
                 id: user_id,
                 pass: password
             };
 
-            // Gửi yêu cầu POST đến server
             fetch("/login", {
                 method: "POST",
                 headers: {
@@ -88,23 +105,21 @@
             })
             .then(response => response.json())
             .then(data => {
+                loadingMessage.style.display = "none"; // Ẩn loading khi có phản hồi
+
                 if (data.status === "success") {
-                    // Đăng nhập thành công, kiểm tra loại tài khoản và chuyển hướng
-                    if (data.type === "gv") {
-                        window.location.href = "/index_gv";  // Giáo viên có quyền thay đổi thời gian
-                    } else if (data.type === "sv") {
-                        window.location.href = "/index_sv";  // Sinh viên không thay đổi thời gian
-                    }
+                    // Chuyển hướng đến trang phù hợp theo API trả về
+                    window.location.href = data.redirect;
                 } else {
-                    // Hiển thị thông báo lỗi
-                    document.getElementById("error-message").textContent = data.message;
-                    document.getElementById("error-message").style.display = "block";
+                    errorMessage.textContent = data.message || "Đăng nhập thất bại!";
+                    errorMessage.style.display = "block";
                 }
             })
             .catch(error => {
                 console.error("Lỗi khi đăng nhập:", error);
-                document.getElementById("error-message").textContent = "Có lỗi xảy ra khi kết nối với server!";
-                document.getElementById("error-message").style.display = "block";
+                loadingMessage.style.display = "none";
+                errorMessage.textContent = "Có lỗi xảy ra khi kết nối với server!";
+                errorMessage.style.display = "block";
             });
         });
     </script>

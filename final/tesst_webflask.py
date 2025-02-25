@@ -8,6 +8,7 @@ from flask import Flask, render_template, Response, jsonify, request
 from scipy.spatial.distance import cosine
 import pandas as pd
 import onnxruntime
+from werkzeug.security import check_password_hash
 
 app = Flask(__name__)
 
@@ -64,38 +65,35 @@ def save_time():
         # In ra lỗi chi tiết
         return jsonify({'message': f'Lỗi khi lưu thời gian: {str(e)}'}), 500
 
+
 @app.route('/login', methods=['POST'])
 def login():
-    data = request.get_json()
-    user_id = data.get('id')
-    password = data.get('pass')
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'status': 'fail', 'message': 'Request không chứa JSON'}), 400
 
-    # Kết nối đến cơ sở dữ liệu
-    conn = connect_to_db()
-    cursor = conn.cursor()
+        user_id = data.get('id')
+        password = data.get('pass')
 
-    # Truy vấn cơ sở dữ liệu để tìm người dùng với user_id và mật khẩu
-    query = "SELECT loai FROM Login WHERE id = ? AND pass = ?"
-    cursor.execute(query, (user_id, password))
-    user = cursor.fetchone()
+        if not user_id or not password:
+            return jsonify({'status': 'fail', 'message': 'Thiếu ID hoặc mật khẩu'}), 400
 
-    if user:
-        # Trả về loai và thông tin chuyển hướng
-        loai = user[0]
-        path = '/index'
-        if loai == 'gv': path = '/index_gv'
-        else: path = 'index_sv'
+        conn = connect_to_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT pass, loai FROM Login WHERE id = ?", (user_id,))
+        user = cursor.fetchone()
+        conn.close()
 
-        return jsonify({
-            'status': 'success',
-            'type': loai,  # Trả về loai từ cơ sở dữ liệu
-            'redirect': path  # Chuyển hướng sau khi đăng nhập thành công
-        })
-    else:
-        return jsonify({
-            'status': 'fail',
-            'message': 'Sai ID hoặc mật khẩu'
-        })
+        if user and check_password_hash(user[0], password):
+            loai = user[1]
+            path = '/index_gv' if loai == 'gv' else '/index_sv'
+            return jsonify({'status': 'success', 'type': loai, 'redirect': path})
+        else:
+            return jsonify({'status': 'fail', 'message': 'Sai ID hoặc mật khẩu'}), 401
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 
 # Khởi tạo mô hình ONNX
 onnx_session = onnxruntime.InferenceSession(r'face_recognition_model.onnx')
