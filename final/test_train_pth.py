@@ -4,12 +4,12 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 import cv2
 import os
-from sklearn.metrics import accuracy_score, pairwise_distances_argmin_min
+from sklearn.metrics import accuracy_score
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.linear_model import LinearRegression
-import torch.nn as nn
-import torch.optim as optim
+from sklearn.decomposition import PCA
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import StandardScaler
 
 # Tiền xử lý ảnh
 def preprocess_image(image_path, required_size=(160, 160)):
@@ -58,48 +58,15 @@ transform = transforms.Compose([
     transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
 ])
 
-# Tạo đối tượng FaceDataset
-dataset = FaceDataset('/final/dataset', transform=transform)
+# Tạo dataset và dataloader
+dataset = FaceDataset(r'dataset', transform=transform)
 dataloader = DataLoader(dataset, batch_size=8, shuffle=True)
 
 # Tải mô hình InceptionResnetV1
 device = torch.device('cuda')
 model = InceptionResnetV1(pretrained='vggface2').to(device)
 
-# Huấn luyện mô hình
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
-model.train()
-num_epochs = 50
-for epoch in range(num_epochs):
-    running_loss = 0.0
-    correct = 0
-    total = 0
-
-    for inputs, labels in dataloader:
-        inputs, labels = inputs.to(device), labels.to(device)
-
-        optimizer.zero_grad()
-        outputs = model(inputs)
-
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
-
-        running_loss += loss.item()
-        _, predicted = torch.max(outputs, 1)
-        correct += (predicted == labels).sum().item()
-        total += labels.size(0)
-
-    epoch_loss = running_loss / len(dataloader)
-    epoch_acc = correct / total * 100
-
-    print(f"Epoch [{epoch + 1}/{num_epochs}] - Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.2f}%")
-
-torch.save(model.state_dict(), 'face_recognition_model2.pth')
-print("Training finished.")
-
-# Đánh giá mô hình
+# Lấy embeddings
 def get_embeddings(model, dataloader, device):
     model.eval()
     embeddings = []
@@ -112,35 +79,57 @@ def get_embeddings(model, dataloader, device):
             labels.append(target_labels.numpy())
     return np.concatenate(embeddings), np.concatenate(labels)
 
-# Tạo đối tượng FaceDataset cho tập kiểm tra
-test_dataset = FaceDataset('/final/dataset', transform=transform)
+# Dataset kiểm tra
+test_dataset = FaceDataset(r'dataset', transform=transform)
 test_dataloader = DataLoader(test_dataset, batch_size=8, shuffle=False)
 
 # Lấy embeddings từ tập huấn luyện và kiểm tra
 train_embeddings, train_labels = get_embeddings(model, dataloader, device)
 test_embeddings, test_labels = get_embeddings(model, test_dataloader, device)
 
-# So sánh embeddings giữa tập kiểm tra và huấn luyện
-distances = pairwise_distances_argmin_min(test_embeddings, train_embeddings)
-test_preds = distances[0]
+# CHUẨN HÓA dữ liệu để hồi quy hoặc phân loại chính xác hơn
+scaler = StandardScaler()
+train_embeddings = scaler.fit_transform(train_embeddings)
+test_embeddings = scaler.transform(test_embeddings)
 
-# Tính accuracy
+# Phân loại bằng k-NN (k=3)
+knn = KNeighborsClassifier(n_neighbors=3)
+knn.fit(train_embeddings, train_labels)
+test_preds = knn.predict(test_embeddings)
+
+# Tính độ chính xác
 accuracy = accuracy_score(test_labels, test_preds)
 print(f"Accuracy on test set: {accuracy * 100:.2f}%")
 
-# Vẽ biểu đồ hồi quy tuyến tính
-X_train = train_embeddings[:, 0].reshape(-1, 1)
-y_train = train_labels
+# PCA để giảm chiều dữ liệu
+pca = PCA(n_components=2)  # Giảm về 2 chiều để trực quan hóa
+train_embeddings_2d = pca.fit_transform(train_embeddings)
+test_embeddings_2d = pca.transform(test_embeddings)
 
-model_lr = LinearRegression()
-model_lr.fit(X_train, y_train)
-
-y_pred = model_lr.predict(X_train)
-
-plt.scatter(X_train, y_train, color='blue', label='Actual labels')
-plt.plot(X_train, y_pred, color='red', label='Linear regression')
-plt.title('Linear Regression on Embeddings')
-plt.xlabel('Embedding Feature')
-plt.ylabel('Labels')
+# Vẽ biểu đồ phân bố embeddings sau khi giảm chiều
+plt.figure(figsize=(8, 6))
+plt.scatter(train_embeddings_2d[:, 0], train_embeddings_2d[:, 1], c=train_labels, cmap='jet', alpha=0.6, label="Train Data")
+plt.scatter(test_embeddings_2d[:, 0], test_embeddings_2d[:, 1], c=test_labels, cmap='coolwarm', marker='x', label="Test Data")
+plt.colorbar()
+plt.title("PCA Visualization of Face Embeddings")
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
 plt.legend()
 plt.show()
+
+import joblib
+
+# Lưu model Facenet (chỉ lưu state_dict để tiết kiệm dung lượng)
+torch.save(model.state_dict(), 'facenet_model.pth')
+
+# Lưu k-NN classifier
+joblib.dump(knn, 'knn_classifier.pkl')
+
+# Lưu StandardScaler để chuẩn hóa dữ liệu sau này
+joblib.dump(scaler, 'scaler.pkl')
+
+# Lưu PCA nếu muốn giảm chiều dữ liệu khi dùng lại
+joblib.dump(pca, 'pca.pkl')
+
+print("Đã lưu mô hình và các thành phần liên quan.")
+

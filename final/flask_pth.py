@@ -1,13 +1,15 @@
 import os
 import numpy as np
+import torch
 import cv2
 import sqlite3
 import json
 from datetime import datetime
 from flask import Flask, render_template, Response, jsonify, request
+from facenet_pytorch import InceptionResnetV1, MTCNN
 from scipy.spatial.distance import cosine
+from torchvision import transforms
 import pandas as pd
-import onnxruntime
 from werkzeug.security import check_password_hash
 
 app = Flask(__name__)
@@ -94,9 +96,21 @@ def login():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+# Khởi tạo mô hình
+device = torch.device("cuda")
+model = InceptionResnetV1(pretrained='vggface2').eval().to(device)
+mtcnn = MTCNN(device=device)
 
-# Khởi tạo mô hình ONNX
-onnx_session = onnxruntime.InferenceSession(r'face_recognition_model.onnx')
+# Tải trọng số đã huấn luyện
+model.load_state_dict(torch.load('facenet_model.pth', map_location=device))
+
+# Tiền xử lý ảnh
+transform = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.Resize((160, 160)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+])
 
 # Đọc dữ liệu từ thư mục và lưu embeddings
 dataset_dir = r'dataset'
@@ -111,17 +125,14 @@ for label in os.listdir(dataset_dir):
         image_path = os.path.join(person_dir, image_name)
         face = cv2.imread(image_path)
         if face is not None:
-            face = cv2.resize(face, (160, 160))
-            face = face.astype('float32')
-            face = (face / 255.0 - 0.5) / 0.5  # Normalize
-            face = np.transpose(face, (2, 0, 1))  # HWC to CHW
-            face = np.expand_dims(face, axis=0)  # Add batch dimension
-
-            # Inference với ONNX
-            input_name = onnx_session.get_inputs()[0].name
-            face_embedding = onnx_session.run(None, {input_name: face})[0].flatten()
-            dataset_embeddings.append(face_embedding)
-            dataset_labels.append(label)
+            boxes, _ = mtcnn.detect(face)
+            if boxes is not None:
+                for box in boxes:
+                    face = face[int(box[1]):int(box[3]), int(box[0]):int(box[2])]
+                    face_tensor = transform(face).unsqueeze(0).to(device)
+                    face_embedding = model(face_tensor).detach().cpu().numpy().flatten()
+                    dataset_embeddings.append(face_embedding)
+                    dataset_labels.append(label)
 
 dataset_embeddings = np.array(dataset_embeddings)
 dataset_labels = np.array(dataset_labels)
@@ -136,41 +147,27 @@ current_frame = None  # Biến toàn cục để lưu frame hiện tại
 # Hàm nhận diện khuôn mặt từ webcam
 def detect_face():
     global detected_label, current_frame
-    cap = cv2.VideoCapture("http://192.168.0.144:81/stream")
+    cap = cv2.VideoCapture(0)
     while True:
         ret, frame = cap.read()
         if not ret:
             continue
         current_frame = frame  # Lưu frame hiện tại
-
-        # Phát hiện khuôn mặt bằng MTCNN (có thể thay thế bằng OpenCV DNN nếu cần)
-        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30))
-
-        if len(faces) > 0:
+        boxes, _ = mtcnn.detect(frame)
+        if boxes is not None:
             detected_label = None
-            for (x, y, w, h) in faces:
-                face = frame[y:y+h, x:x+w]
-                face = cv2.resize(face, (160, 160))
-                face = face.astype('float32')
-                face = (face / 255.0 - 0.5) / 0.5  # Normalize
-                face = np.transpose(face, (2, 0, 1))  # HWC to CHW
-                face = np.expand_dims(face, axis=0)  # Add batch dimension
-
-                # Inference với ONNX
-                input_name = onnx_session.get_inputs()[0].name
-                face_embedding = onnx_session.run(None, {input_name: face})[0].flatten()
-
+            for box in boxes:
+                face = frame[int(box[1]):int(box[3]), int(box[0]):int(box[2])]
+                face_tensor = transform(face).unsqueeze(0).to(device)
+                face_embedding = model(face_tensor).detach().cpu().numpy().flatten()
                 distances = [cosine(face_embedding, stored_embedding) for stored_embedding in dataset_embeddings]
                 min_distance_idx = np.argmin(distances)
                 min_distance = distances[min_distance_idx]
-                label = dataset_labels[min_distance_idx] if min_distance < 0.4 else "Unknown"
+                label = dataset_labels[min_distance_idx] if min_distance < 0.5 else "Unknown"
                 detected_label = label
                 color = (0, 255, 0) if label != "Unknown" else (0, 0, 255)
-                cv2.rectangle(frame, (x, y), (x+w, y+h), color, 2)
-                cv2.putText(frame, label, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
-
+                cv2.rectangle(frame, (int(box[0]), int(box[1])), (int(box[2]), int(box[3])), color, 2)
+                cv2.putText(frame, label, (int(box[0]), int(box[1]) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
         _, buffer = cv2.imencode('.jpg', frame)
         yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
     cap.release()
