@@ -136,7 +136,7 @@ current_frame = None  # Biến toàn cục để lưu frame hiện tại
 # Hàm nhận diện khuôn mặt từ webcam
 def detect_face():
     global detected_label, current_frame
-    cap = cv2.VideoCapture("http://192.168.0.144:81/stream")
+    cap = cv2.VideoCapture(0)
     while True:
         ret, frame = cap.read()
         if not ret:

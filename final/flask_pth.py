@@ -102,7 +102,7 @@ model = InceptionResnetV1(pretrained='vggface2').eval().to(device)
 mtcnn = MTCNN(device=device)
 
 # Tải trọng số đã huấn luyện
-model.load_state_dict(torch.load('facenet_model.pth', map_location=device))
+model.load_state_dict(torch.load('face_recognition_model.pth', map_location=device))
 
 # Tiền xử lý ảnh
 transform = transforms.Compose([

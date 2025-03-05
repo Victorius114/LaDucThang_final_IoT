@@ -1,0 +1,120 @@
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            text-align: center;
+            background: linear-gradient(to right, #00c853, #b2ff59);
+            font-family: Arial, sans-serif;
+        }
+
+        .header {
+            width: 100%;
+            background: #00796b;
+            padding: 20px 0;
+            text-align: center;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .title {
+            font-size: 50px;
+            color: white;
+            margin: 0;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .content {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: flex-start;
+            width: 100%;
+            padding: 20px;
+        }
+
+        .left-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-right: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .right-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .buttons {
+            margin-top: 10px;
+        }
+
+        button {
+            margin: 5px;
+            padding: 12px 24px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            background: #00796b;
+            color: white;
+            transition: 0.3s;
+        }
+
+        button:hover {
+            background: #004d40;
+            transform: scale(1.05);
+        }
+
+        #message {
+            margin-top: 15px;
+            font-size: 20px;
+            font-weight: bold;
+            padding: 10px;
+            border-radius: 5px;
+        }
+
+        #diemdanh-list {
+            margin-top: 10px;
+            width: 90%;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 15px;
+            text-align: left;
+            background: #e8f5e9;
+            border-radius: 5px;
+            font-size: 18px;
+        }
+
+        input {
+            font-size: 20px;
+            padding: 5px;
+            width: 80px;
+            text-align: center;
+            border: 2px solid #00796b;
+            border-radius: 5px;
+        }
+
+        h1 {
+            font-size: 30px;
+            color: #00796b;
+        }
+
+        label {
+            font-size: 22px;
+            font-weight: bold;
+            color: #004d40;
+        }

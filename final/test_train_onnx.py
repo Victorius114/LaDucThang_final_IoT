@@ -57,7 +57,7 @@ transform = transforms.Compose([
 ])
 
 # Tạo đối tượng FaceDataset
-dataset = FaceDataset('E:/Ky2_2024_2025/BT_IoT_CV/dataset2', transform=transform)
+dataset = FaceDataset(r'dataset', transform=transform)
 dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
 # Tải mô hình InceptionResnetV1
@@ -92,7 +92,7 @@ def get_embeddings(model, dataloader, device):
     return np.concatenate(embeddings), np.concatenate(labels)
 
 # Tạo đối tượng FaceDataset cho tập kiểm tra
-test_dataset = FaceDataset('dataset', transform=transform)
+test_dataset = FaceDataset(r'dataset', transform=transform)
 test_dataloader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
 # Lấy embeddings từ tập huấn luyện và kiểm tra
