@@ -96,7 +96,7 @@ def login():
 
 
 # Khởi tạo mô hình ONNX
-onnx_session = onnxruntime.InferenceSession(r'face_recognition_model2.onnx')
+onnx_session = onnxruntime.InferenceSession(r'face_recognition_model.onnx')
 
 # Đọc dữ liệu từ thư mục và lưu embeddings
 dataset_dir = r'dataset'
